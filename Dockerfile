@@ -66,15 +66,17 @@ COPY supervisord.conf /etc/supervisor/conf.d/
 ##############################################
 # 7) Fetch noVNC & websockify (v1.6.0 & v0.13.0)
 ##############################################
+USER wineuser
 WORKDIR /home/wineuser
 RUN mkdir -p novnc novnc/utils/websockify \
- && wget -qO /tmp/noVNC.tar.gz https://github.com/novnc/noVNC/archive/refs/tags/v1.6.0.tar.gz \
+ && wget --timeout=30 --tries=3 -qO /tmp/noVNC.tar.gz \
+      https://github.com/novnc/noVNC/archive/refs/tags/v1.6.0.tar.gz \
  && tar xzf /tmp/noVNC.tar.gz --strip-components=1 -C novnc \
  && rm /tmp/noVNC.tar.gz \
- && wget -qO /tmp/websockify.tar.gz https://github.com/novnc/websockify/archive/refs/tags/v0.13.0.tar.gz \
+ && wget --timeout=30 --tries=3 -qO /tmp/websockify.tar.gz \
+      https://github.com/novnc/websockify/archive/refs/tags/v0.13.0.tar.gz \
  && tar xzf /tmp/websockify.tar.gz --strip-components=1 -C novnc/utils/websockify \
- && rm /tmp/websockify.tar.gz \
- && chown -R wineuser:wineuser novnc
+ && rm /tmp/websockify.tar.gz
 
 ##############################################
 # 8) Expose & run
