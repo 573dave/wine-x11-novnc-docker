@@ -1,89 +1,82 @@
-# syntax=docker/dockerfile:1
-##############################################
-# Base image & environment
-##############################################
-FROM ubuntu:22.04
-ARG DEBIAN_FRONTEND=noninteractive
-ENV LANG=en_US.UTF-8 \
-    LC_ALL=C.UTF-8 \
-    WINEDEBUG=-all
+[supervisord]
+nodaemon=true
+logfile=/dev/null
+logfile_maxbytes=0
+pidfile=/tmp/supervisord.pid
 
-##############################################
-# 1) Core & WineHQ setup
-##############################################
-RUN dpkg --add-architecture i386 \
- && apt-get update \
- && apt-get install -y --no-install-recommends \
-      ca-certificates gnupg2 software-properties-common \
-      wget cabextract curl \
- && mkdir -p /etc/apt/keyrings \
- && wget --timeout=30 --tries=3 -qO- https://dl.winehq.org/wine-builds/winehq.key \
-      | gpg --dearmor > /etc/apt/keyrings/winehq-archive-keyring.gpg \
- && echo "deb [signed-by=/etc/apt/keyrings/winehq-archive-keyring.gpg] \
-      https://dl.winehq.org/wine-builds/ubuntu/ jammy main" \
-      > /etc/apt/sources.list.d/winehq.list \
- && apt-get update \
- && apt-get install -y --no-install-recommends \
-      winehq-staging libvulkan1 vulkan-tools winetricks \
-      python3 xvfb x11vnc xdotool supervisor net-tools fluxbox \
- && apt-get clean \
- && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+[supervisorctl]
+serverurl=unix:///tmp/supervisor.sock
 
-##############################################
-# 2) Create wineuser & directories
-##############################################
-RUN useradd -m -s /bin/bash wineuser \
- && mkdir -p /home/wineuser/{prefix32,novnc,novnc/utils/websockify,.fluxbox} \
- && chown -R wineuser:wineuser /home/wineuser
+;———— Xvfb (Virtual Display) ————
+[program:xvfb]
+command=/usr/bin/Xvfb :0 -screen 0 1024x768x24 -nolisten tcp
+user=wineuser
+priority=10
+startsecs=3
+autorestart=true
+stopasgroup=true
+killasgroup=true
+stdout_logfile=/dev/fd/1
+stdout_logfile_maxbytes=0
+stderr_logfile=/dev/fd/2
+stderr_logfile_maxbytes=0
 
-##############################################
-# 3) Supervisor configs & Fluxbox setup
-##############################################
-COPY supervisord.conf /etc/supervisor/conf.d/
-RUN printf 'session.screen0.toolbar: false\n' \
-     > /home/wineuser/.fluxbox/init \
- && chown wineuser:wineuser /home/wineuser/.fluxbox/init
+;———— x11vnc (VNC Server) ————
+[program:x11vnc]
+command=/usr/bin/x11vnc -display :0 -forever -shared -noxrecord -noxfixes -noxdamage -rfbport 5900 -passwd /home/wineuser/.vnc/passwd
+user=wineuser
+priority=20
+startsecs=5
+autorestart=true
+stopasgroup=true
+killasgroup=true
+stdout_logfile=/dev/fd/1
+stdout_logfile_maxbytes=0
+stderr_logfile=/dev/fd/2
+stderr_logfile_maxbytes=0
 
-##############################################
-# 4) Precache fonts for faster startup
-##############################################
-RUN fc-cache -fv
+;———— noVNC (Web VNC Client) ————
+[program:novnc]
+command=python3 /home/wineuser/novnc/utils/websockify/websockify.py --web /home/wineuser/novnc 8080 localhost:5900
+user=wineuser
+priority=30
+startsecs=5
+autorestart=true
+stopasgroup=true
+killasgroup=true
+stdout_logfile=/dev/fd/1
+stdout_logfile_maxbytes=0
+stderr_logfile=/dev/fd/2
+stderr_logfile_maxbytes=0
 
-##############################################
-# 5) Fetch noVNC & websockify (v1.6.0 & v0.13.0)
-##############################################
-USER wineuser
-WORKDIR /home/wineuser
-RUN mkdir -p novnc novnc/utils/websockify \
- && wget --timeout=30 --tries=3 -qO /tmp/noVNC.tar.gz \
-      https://github.com/novnc/noVNC/archive/refs/tags/v1.6.0.tar.gz \
- && tar xzf /tmp/noVNC.tar.gz --strip-components=1 -C novnc \
- && rm /tmp/noVNC.tar.gz \
- && wget --timeout=30 --tries=3 -qO /tmp/websockify.tar.gz \
-      https://github.com/novnc/websockify/archive/refs/tags/v0.13.0.tar.gz \
- && tar xzf /tmp/websockify.tar.gz --strip-components=1 -C novnc/utils/websockify \
- && rm /tmp/websockify.tar.gz
+;———— Fluxbox (Window Manager) ————
+[program:fluxbox]
+command=/usr/bin/fluxbox
+user=wineuser
+environment=DISPLAY=":0"
+priority=40
+startsecs=5
+autorestart=true
+stopasgroup=true
+killasgroup=true
+stdout_logfile=/dev/fd/1
+stdout_logfile_maxbytes=0
+stderr_logfile=/dev/fd/2
+stderr_logfile_maxbytes=0
 
-##############################################
-# 6) Enable DXVK in Win32 prefix (with error handling)
-##############################################
-ENV WINEPREFIX=/home/wineuser/prefix32 \
-    WINEARCH=win32 \
-    DISPLAY=:0
-
-# Initialize wine prefix first, then install DXVK
-RUN wineboot --init \
- && winetricks -q --force dxvk || echo "DXVK installation failed, continuing..."
-
-##############################################
-# 7) Expose port & health check
-##############################################
-EXPOSE 8080
-
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-  CMD curl -f http://localhost:8080/vnc.html || exit 1
-
-##############################################
-# 8) Set entrypoint
-##############################################
-CMD ["supervisord", "-n"]
+;———— Wine Explorer (Optional) ————
+[program:explorer]
+command=wine explorer.exe
+directory=/home/wineuser/prefix32/drive_c/windows
+environment=DISPLAY=":0",WINEPREFIX="/home/wineuser/prefix32",WINEARCH="win32"
+user=wineuser
+priority=50
+startsecs=10
+autorestart=true
+autostart=false
+stopasgroup=true
+killasgroup=true
+stdout_logfile=/dev/fd/1
+stdout_logfile_maxbytes=0
+stderr_logfile=/dev/fd/2
+stderr_logfile_maxbytes=0
