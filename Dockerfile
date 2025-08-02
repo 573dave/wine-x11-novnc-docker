@@ -17,12 +17,13 @@ RUN dpkg --add-architecture i386 \
  && apt-get update \
  && apt-get install -y --no-install-recommends \
     ca-certificates gnupg2 software-properties-common wget \
+    cabextract \
  && mkdir -p /etc/apt/keyrings \
  && wget -qO- https://dl.winehq.org/wine-builds/winehq.key \
-      | gpg --dearmor > /etc/apt/keyrings/winehq-archive-keyring.gpg \
+       | gpg --dearmor > /etc/apt/keyrings/winehq-archive-keyring.gpg \
  && echo "deb [signed-by=/etc/apt/keyrings/winehq-archive-keyring.gpg] \
-      https://dl.winehq.org/wine-builds/ubuntu/ jammy main" \
-      > /etc/apt/sources.list.d/winehq.list \
+       https://dl.winehq.org/wine-builds/ubuntu/ jammy main" \
+       > /etc/apt/sources.list.d/winehq.list \
  && apt-get update \
  && apt-get install -y --no-install-recommends \
     winehq-staging \
