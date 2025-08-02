@@ -17,19 +17,13 @@ This container runs:
 #### Run it
 
     # Start the container
-    ```
     docker run --rm -p 8080:8080 solarkennedy/wine-x11-novnc-docker
-    ```
 
     # Show the container ID (this is the VNC password)
-    ```
     docker ps
-    ```
 
     # Open VNC in your web browser
-    ```
     xdg-open http://localhost:8080
-    ```
 
 
 In your web browser, type the container ID as password, and then you should see the default application, explorer.exe:
