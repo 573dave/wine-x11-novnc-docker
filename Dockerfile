@@ -87,7 +87,8 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 # 8) Create VNC password script
 ##############################################
 USER root
-RUN cat > /usr/local/bin/setup-vnc-password.sh << 'EOF'
+RUN cat > /usr/local/bin/setup-vnc-password.sh << 'EOF' \
+&& chmod +x /usr/local/bin/setup-vnc-password.sh
 #!/bin/bash
 # Generate random 6-digit password
 VNC_PASSWORD=$(shuf -i 100000-999999 -n 1)
@@ -106,8 +107,6 @@ chown wineuser:wineuser /home/wineuser/.vnc/passwd
 # Start supervisord
 exec supervisord -n
 EOF
-
-RUN chmod +x /usr/local/bin/setup-vnc-password.sh
 
 ##############################################
 # 9) Set entrypoint
