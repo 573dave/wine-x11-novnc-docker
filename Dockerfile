@@ -1,5 +1,8 @@
 # syntax=docker/dockerfile:1
 
+##############################################
+# Base image & env
+##############################################
 FROM ubuntu:22.04
 
 ARG DEBIAN_FRONTEND=noninteractive
@@ -51,8 +54,7 @@ RUN winetricks -q dxvk
 # 5) Minimal Fluxbox config (no toolbar)
 ##############################################
 USER root
-RUN mkdir -p /home/wineuser/.fluxbox \
- && printf 'session.screen0.toolbar: false\n' \
+RUN printf 'session.screen0.toolbar: false\n' \
     > /home/wineuser/.fluxbox/init \
  && chown wineuser:wineuser /home/wineuser/.fluxbox/init
 
@@ -62,16 +64,16 @@ RUN mkdir -p /home/wineuser/.fluxbox \
 COPY supervisord.conf /etc/supervisor/conf.d/
 
 ##############################################
-# 7) Fetch noVNC & websockify robustly
+# 7) Fetch noVNC & websockify (v1.6.0 & v0.13.0)
 ##############################################
 WORKDIR /home/wineuser
 RUN mkdir -p novnc novnc/utils/websockify \
- && wget -qO noVNC.tar.gz https://github.com/novnc/noVNC/archive/v1.5.0.tar.gz \
- && tar xzf noVNC.tar.gz --strip-components=1 -C novnc \
- && rm noVNC.tar.gz \
- && wget -qO websockify.tar.gz https://github.com/novnc/websockify/archive/v0.11.0.tar.gz \
- && tar xzf websockify.tar.gz --strip-components=1 -C novnc/utils/websockify \
- && rm websockify.tar.gz \
+ && wget -qO /tmp/noVNC.tar.gz https://github.com/novnc/noVNC/archive/refs/tags/v1.6.0.tar.gz \
+ && tar xzf /tmp/noVNC.tar.gz --strip-components=1 -C novnc \
+ && rm /tmp/noVNC.tar.gz \
+ && wget -qO /tmp/websockify.tar.gz https://github.com/novnc/websockify/archive/refs/tags/v0.13.0.tar.gz \
+ && tar xzf /tmp/websockify.tar.gz --strip-components=1 -C novnc/utils/websockify \
+ && rm /tmp/websockify.tar.gz \
  && chown -R wineuser:wineuser novnc
 
 ##############################################
