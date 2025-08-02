@@ -55,8 +55,11 @@ RUN winetricks -q dxvk
 ##############################################
 # 5) Minimal Fluxbox config (no toolbar)
 ##############################################
-RUN printf 'session.screen0.toolbar: false\n' \
-    > /home/wineuser/.fluxbox/init
+USER root
+RUN mkdir -p /home/wineuser/.fluxbox \
+ && echo "session.screen0.toolbar: false" \
+    > /home/wineuser/.fluxbox/init \
+ && chown wineuser:wineuser /home/wineuser/.fluxbox/init
 
 ##############################################
 # 6) Supervisor config
