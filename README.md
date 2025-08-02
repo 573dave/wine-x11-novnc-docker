@@ -3,32 +3,33 @@
 ![Docker Image Size (tag)](https://img.shields.io/docker/image-size/solarkennedy/wine-x11-novnc-docker/latest)
 ![Docker Pulls](https://img.shields.io/docker/pulls/solarkennedy/wine-x11-novnc-docker)
 
-Not a very good name, is it?
-
-Ever wanted to containerize your wine applications and access them via
-a web browser? No? Neither did I!
+**Containerized Wine desktop** in your browser—no GUI on your host required.
 
 This container runs:
+- **Xvfb** – in-memory X11 server
+- **x11vnc** – VNC server scraping Xvfb  
+- **noVNC** – HTML5 VNC client (access at http://localhost:8080)  
+- **Fluxbox** – minimal window manager  
+- **Explorer.exe** – demo Windows app via Wine  
 
-* Xvfb - X11 in a virtual framebuffer
-* x11vnc - A VNC server that scrapes the above X11 server
-* [noNVC](https://kanaka.github.io/noVNC/) - A HTML5 canvas vnc viewer
-* Fluxbox - a small window manager
-* Explorer.exe - to demo that it works
+**Trusted build** on Docker Hub.
 
-This is a [trusted build](https://registry.hub.docker.com/u/solarkennedy/wine-x11-novnc-docker/)
-on the Docker Hub.
-
-## Run It
+#### Run it
 
     # Start the container
+    ```
     docker run --rm -p 8080:8080 solarkennedy/wine-x11-novnc-docker
+    ```
 
     # Show the container ID (this is the VNC password)
+    ```
     docker ps
+    ```
 
     # Open VNC in your web browser
+    ```
     xdg-open http://localhost:8080
+    ```
 
 
 In your web browser, type the container ID as password, and then you should see the default application, explorer.exe:
