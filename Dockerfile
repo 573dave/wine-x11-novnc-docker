@@ -84,6 +84,33 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
   CMD curl -f http://localhost:8080/vnc.html || exit 1
 
 ##############################################
-# 8) Set entrypoint
+# 8) Create VNC password script
 ##############################################
-CMD ["supervisord", "-n"]
+USER root
+RUN cat > /usr/local/bin/setup-vnc-password.sh << 'EOF'
+#!/bin/bash
+# Generate random 6-digit password
+VNC_PASSWORD=$(shuf -i 100000-999999 -n 1)
+echo "===========================================" 
+echo "VNC PASSWORD: $VNC_PASSWORD"
+echo "==========================================="
+echo "Access noVNC at: http://localhost:8080/vnc.html"
+echo "==========================================="
+
+# Create VNC password file
+mkdir -p /home/wineuser/.vnc
+echo "$VNC_PASSWORD" | vncpasswd -f > /home/wineuser/.vnc/passwd
+chmod 600 /home/wineuser/.vnc/passwd
+chown wineuser:wineuser /home/wineuser/.vnc/passwd
+
+# Start supervisord
+exec supervisord -n
+EOF
+
+RUN chmod +x /usr/local/bin/setup-vnc-password.sh
+
+##############################################
+# 9) Set entrypoint
+##############################################
+USER wineuser
+CMD ["/usr/local/bin/setup-vnc-password.sh"]
