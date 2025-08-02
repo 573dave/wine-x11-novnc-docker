@@ -62,14 +62,17 @@ RUN mkdir -p /home/wineuser/.fluxbox \
 COPY supervisord.conf /etc/supervisor/conf.d/
 
 ##############################################
-# 7) Fetch noVNC & websockify (fixed tag)
+# 7) Fetch noVNC & websockify robustly
 ##############################################
 WORKDIR /home/wineuser
-RUN wget -qO- https://github.com/novnc/noVNC/archive/v1.5.0.tar.gz \
-      | tar xz --strip-components=1 -C novnc \
- && wget -qO- https://github.com/novnc/websockify/archive/v0.11.0.tar.gz \
-      | tar xz --strip-components=1 -C novnc/utils/websockify \
- && chown -R wineuser:wineuser /home/wineuser/novnc
+RUN mkdir -p novnc novnc/utils/websockify \
+ && wget -qO noVNC.tar.gz https://github.com/novnc/noVNC/archive/v1.5.0.tar.gz \
+ && tar xzf noVNC.tar.gz --strip-components=1 -C novnc \
+ && rm noVNC.tar.gz \
+ && wget -qO websockify.tar.gz https://github.com/novnc/websockify/archive/v0.11.0.tar.gz \
+ && tar xzf websockify.tar.gz --strip-components=1 -C novnc/utils/websockify \
+ && rm websockify.tar.gz \
+ && chown -R wineuser:wineuser novnc
 
 ##############################################
 # 8) Expose & run
