@@ -1,31 +1,74 @@
-FROM ubuntu:focal
+# syntax=docker/dockerfile:1
 
-ENV HOME /root
-ENV DEBIAN_FRONTEND noninteractive
-ENV LC_ALL C.UTF-8
-ENV LANG en_US.UTF-8
-ENV LANGUAGE en_US.UTF-8
+# 1) Use a newer LTS and slimmer image
+FROM ubuntu:22.04 AS base
 
-RUN dpkg --add-architecture i386 && \
-    apt-get update && apt-get -y install python3 python-is-python3 xvfb x11vnc xdotool wget tar supervisor net-tools fluxbox gnupg2 && \
-    echo 'echo -n $HOSTNAME' > /root/x11vnc_password.sh && chmod +x /root/x11vnc_password.sh && \
-    wget -O - https://dl.winehq.org/wine-builds/winehq.key | apt-key add - && \
-    echo 'deb https://dl.winehq.org/wine-builds/ubuntu/ focal main' | tee /etc/apt/sources.list.d/winehq.list && \
-    apt-get update && apt-get -y install winehq-stable=7.0.1~focal-1 && \
-    mkdir /opt/wine-stable/share/wine/mono && wget -O - https://dl.winehq.org/wine/wine-mono/7.0.0/wine-mono-7.0.0-x86.tar.xz | tar -xJv -C /opt/wine-stable/share/wine/mono && \
-    mkdir /opt/wine-stable/share/wine/gecko && wget -O /opt/wine-stable/share/wine/gecko/wine-gecko-2.47.2-x86.msi https://dl.winehq.org/wine/wine-gecko/2.47.2/wine-gecko-2.47.2-x86.msi && wget -O /opt/wine-stable/share/wine/gecko/wine-gecko-2.47.2-x86_64.msi https://dl.winehq.org/wine/wine-gecko/2.47.2/wine-gecko-2.47.2-x86_64.msi && \
-    apt-get -y full-upgrade && apt-get clean && rm -rf /var/lib/apt/lists/*
-ADD supervisord.conf /etc/supervisor/conf.d/supervisord.conf
-ADD supervisord-wine.conf /etc/supervisor/conf.d/supervisord-wine.conf
+# 2) Build args / env
+ARG DEBIAN_FRONTEND=noninteractive
+ENV LANG=en_US.UTF-8 \
+    LC_ALL=C.UTF-8
 
-ENV WINEPREFIX /root/prefix32
-ENV WINEARCH win32
-ENV DISPLAY :0
+# 3) Install core dependencies (no-install-recommends to slim down)
+RUN dpkg --add-architecture i386 \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    gnupg2 \
+    software-properties-common \
+    python3 \
+    xvfb \
+    x11vnc \
+    xdotool \
+    wget \
+    supervisor \
+    net-tools \
+    fluxbox \
+ && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /root/
-RUN wget -O - https://github.com/novnc/noVNC/archive/v1.3.0.tar.gz | tar -xzv -C /root/ && mv /root/noVNC-1.3.0 /root/novnc && ln -s /root/novnc/vnc_lite.html /root/novnc/index.html && \
-    wget -O - https://github.com/novnc/websockify/archive/v0.11.0.tar.gz | tar -xzv -C /root/ && mv /root/websockify-0.11.0 /root/novnc/utils/websockify
+# 4) Add WineHQ key with 'signed-by=' (apt-key is deprecated)
+RUN mkdir -p /etc/apt/keyrings \
+ && wget -qO- https://dl.winehq.org/wine-builds/winehq.key \
+    | gpg --dearmor > /etc/apt/keyrings/winehq-archive-keyring.gpg \
+ && echo \
+    "deb [signed-by=/etc/apt/keyrings/winehq-archive-keyring.gpg] \
+     https://dl.winehq.org/wine-builds/ubuntu/ jammy main" \
+    > /etc/apt/sources.list.d/winehq.list
+
+# 5) Install Wine (latest stable, no pin)
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends winehq-stable \
+ && rm -rf /var/lib/apt/lists/*
+
+# 6) Create an unprivileged user for running X/VNC/Wine
+ENV WINEPREFIX=/home/wineuser/prefix32 \
+    WINEARCH=win32 \
+    DISPLAY=:0
+RUN useradd -m -s /bin/bash wineuser \
+ && mkdir -p /home/wineuser/{prefix32,novnc,novnc/utils/websockify} \
+ && chown -R wineuser:wineuser /home/wineuser
+
+# 7) Set up x11vnc password script
+RUN echo 'echo -n $HOSTNAME' \
+     > /home/wineuser/x11vnc_password.sh \
+ && chmod +x /home/wineuser/x11vnc_password.sh \
+ && chown wineuser:wineuser /home/wineuser/x11vnc_password.sh
+
+# 8) Copy Supervisor configs
+COPY supervisord.conf /etc/supervisor/conf.d/
+
+WORKDIR /home/wineuser
+
+# 9) Fetch noVNC & websockify (pin or update to latest)
+RUN wget -qO- https://github.com/novnc/noVNC/archive/v1.5.0.tar.gz \
+    | tar xz --strip-components=1 -C /home/wineuser/novnc \
+ && wget -qO- https://github.com/novnc/websockify/archive/v0.12.0.tar.gz \
+    | tar xz --strip-components=1 -C /home/wineuser/novnc/utils/websockify \
+ && chown -R wineuser:wineuser /home/wineuser/novnc
 
 EXPOSE 8080
 
-CMD ["/usr/bin/supervisord"]
+# 10) Drop root privileges
+USER wineuser
+
+# 11) Run Supervisor in foreground
+CMD ["supervisord", "-n"]
